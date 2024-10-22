@@ -75,20 +75,80 @@ class Main:
 
         self.toolbar_frame = ttk.Frame(self.root, style="red.TFrame")
         self.password_list_frame = ttk.Frame(self.root, style="green.TFrame")
+        self.password_list_canvas = tk.Canvas(self.password_list_frame, scrollregion= (0, 0, 0, len(self.get_passwords())*35), height=self.password_list_frame.winfo_height(), width=50)
         self.password_info_frame = ttk.Frame(self.root, style="blue.TFrame")
 
         self.toolbar_frame.pack(side="top", fill="x")
         self.password_list_frame.pack(fill="both", expand=True, side="left")
+        self.password_list_canvas.pack(fill="both", expand=True, side="left")
         self.password_info_frame.pack(fill="both", expand=True, side="right")
+
+        self.password_list_canvas.bind("<MouseWheel>", lambda e: self.password_list_canvas.yview_scroll(int(-e.delta/60), "units"))
+        self.scrollbar = ttk.Scrollbar(self.password_list_canvas, orient="vertical", command=self.password_list_canvas.yview)
+        self.password_list_canvas.configure(yscrollcommand= self.scrollbar.set)
+        self.scrollbar.place(relx=1, rely=0, relheight=1, anchor="ne")
+
 
         self.add_password_button = ttk.Button(self.toolbar_frame, text="Ajouter MDP", command=self.add_password_popup)
         self.add_password_button.pack(side="left",padx=2, pady=2)
 
+        self.show_passwords()
+
         self.root.mainloop()
+
+    def get_passwords(self):
+        return self.db.afficher_tout()
+
+    def update_password_list(self):
+        self.password_list_frame.destroy()
+        self.password_list_canvas.destroy()
+        self.scrollbar.destroy()
+
+
+        self.password_list_frame = ttk.Frame(self.root, style="green.TFrame")
+        self.password_list_canvas = tk.Canvas(self.password_list_frame, scrollregion= (0, 0, 0, len(self.get_passwords())*35), height=self.password_list_frame.winfo_height(), width=50)
+
+        self.password_list_frame.pack(fill="both", expand=True, side="left")
+        self.password_list_canvas.pack(fill="both", expand=True, side="left")
+
+        self.password_list_canvas.bind("<MouseWheel>", lambda e: self.password_list_canvas.yview_scroll(int(-e.delta/60), "units"))
+        self.scrollbar = ttk.Scrollbar(self.password_list_canvas, orient="vertical", command=self.password_list_canvas.yview)
+        self.password_list_canvas.configure(yscrollcommand= self.scrollbar.set)
+        self.scrollbar.place(relx=1, rely=0, relheight=1, anchor="ne")
+
+        self.show_passwords()
+    
+    def show_password_infos(self, password):
+        self.password_info_frame.destroy()
+        self.password_info_frame = ttk.Frame(self.root, style="blue.TFrame")
+        self.password_info_frame.pack(fill="both", expand=True, side="right")
+
+        ttk.Label(self.password_info_frame, text=password[1]).grid(row=0, column=0, padx=10, pady=10)
+
+        ttk.Label(self.password_info_frame, text="MDP : ").grid(row=1, column=0, padx=5, pady=5)
+        ttk.Entry(self.password_info_frame).grid(row=1, column=1, padx=5, pady=5)
+
+        ttk.Label(self.password_info_frame, text="User : ").grid(row=2, column=0, padx=5, pady=5)
+        ttk.Entry(self.password_info_frame).grid(row=2, column=1, padx=5, pady=5)
+
+        ttk.Label(self.password_info_frame, text="URL : ").grid(row=3, column=0, padx=5, pady=5)
+        ttk.Entry(self.password_info_frame).grid(row=3, column=1, padx=5, pady=5)
+
+        ttk.Button(self.password_info_frame, text="Sauvegarder").grid(row=4, column=0, padx=10, pady=10)
+        ttk.Button(self.password_info_frame, text="Supprimer").grid(row=4, column=1, padx=10, pady=10)
+
+    
+    def show_passwords(self):
+        for y_coeff, password in enumerate(self.get_passwords()):
+            self.password = password
+            button_password = ttk.Button(self.password_list_frame, text=self.password[1], command=lambda password=password: self.show_password_infos(password))
+            x = (self.password_list_canvas.winfo_reqwidth() / 2)
+            button_password_window = self.password_list_canvas.create_window(x, y_coeff*35+20, window=button_password)
 
     def add_password_save(self):
         self.db.ajouter_mdp(self.password_title_var.get(), self.password_username_var.get(), self.password_password_var.get(), self.password_url_var.get())
         self.popup.destroy()
+        self.update_password_list()
 
     def add_password_popup(self):
         self.popup = tk.Toplevel(self.root)

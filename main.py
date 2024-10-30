@@ -1,6 +1,7 @@
 import sqlite3
 import tkinter as tk
 from tkinter import ttk
+from tkinter.messagebox import askyesno
 import os
 
 PWD = os.getcwd()
@@ -31,9 +32,7 @@ class Base:
     def ajouter_mdp(self, title: str, username: str, password: str, url: str) -> None:
         print(title, username, password, url)
         self.cursor.execute("""insert into MDP(title, username, password, url) values(?, ?, ?, ?)""", (title, username, password, url))
-        print(6)
         self.db.commit()
-        print(7)
 
     def supprimer_mdp_titre(self, title: str) -> None:
         self.cursor.execute("""delete from MDP where title = ?""", (title, ))
@@ -64,7 +63,7 @@ class Main:
         self.root = tk.Tk()
         self.root.title("Gestionnaire de Mots De Passe 2000")
 
-        self.root.geometry("300x200")
+        self.root.geometry("400x200")
 
         s = ttk.Style()
         s.configure('red.TFrame', background='#FF0000')
@@ -81,7 +80,7 @@ class Main:
         self.toolbar_frame.pack(side="top", fill="x")
         self.password_list_frame.pack(fill="both", expand=True, side="left")
         self.password_list_canvas.pack(fill="both", expand=True, side="left")
-        self.password_info_frame.pack(fill="both", expand=True, side="right")
+        self.password_info_frame.pack(fill="both", side="right") # expand=True, 
 
         self.password_list_canvas.bind("<MouseWheel>", lambda e: self.password_list_canvas.yview_scroll(int(-e.delta/60), "units"))
         self.scrollbar = ttk.Scrollbar(self.password_list_canvas, orient="vertical", command=self.password_list_canvas.yview)
@@ -121,28 +120,51 @@ class Main:
     def show_password_infos(self, password):
         self.password_info_frame.destroy()
         self.password_info_frame = ttk.Frame(self.root, style="blue.TFrame")
-        self.password_info_frame.pack(fill="both", expand=True, side="right")
+        self.password_info_frame.pack(fill="both", side="right") # expand=True,
 
-        ttk.Label(self.password_info_frame, text=password[1]).grid(row=0, column=0, padx=10, pady=10)
+        self.password_info_title_label = ttk.Label(self.password_info_frame, text="Titre : ")
+        self.password_info_title_label.grid(row=0, column=0, padx=5, pady=5)
+        self.password_info_title_entry = ttk.Entry(self.password_info_frame,)
+        self.password_info_title_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.password_info_title_entry.insert(0, password[1])
 
-        ttk.Label(self.password_info_frame, text="MDP : ").grid(row=1, column=0, padx=5, pady=5)
-        ttk.Entry(self.password_info_frame).grid(row=1, column=1, padx=5, pady=5)
-
-        ttk.Label(self.password_info_frame, text="User : ").grid(row=2, column=0, padx=5, pady=5)
-        ttk.Entry(self.password_info_frame).grid(row=2, column=1, padx=5, pady=5)
-
-        ttk.Label(self.password_info_frame, text="URL : ").grid(row=3, column=0, padx=5, pady=5)
-        ttk.Entry(self.password_info_frame).grid(row=3, column=1, padx=5, pady=5)
-
-        ttk.Button(self.password_info_frame, text="Sauvegarder").grid(row=4, column=0, padx=10, pady=10)
-        ttk.Button(self.password_info_frame, text="Supprimer").grid(row=4, column=1, padx=10, pady=10)
-
+        self.password_info_username_label = ttk.Label(self.password_info_frame, text="User : ")
+        self.password_info_username_label.grid(row=1, column=0, padx=5, pady=5)
+        self.password_info_username_entry = ttk.Entry(self.password_info_frame)
+        self.password_info_username_entry.grid(row=1, column=1, padx=5, pady=5)
+        self.password_info_username_entry.insert(0, password[2])
     
+        self.password_info_password_label = ttk.Label(self.password_info_frame, text="MDP : ")
+        self.password_info_password_label.grid(row=2, column=0, padx=5, pady=5)
+        self.password_info_password_entry = ttk.Entry(self.password_info_frame)
+        self.password_info_password_entry.grid(row=2, column=1, padx=5, pady=5)
+        self.password_info_password_entry.insert(0, password[3])
+
+        self.password_info_url_label = ttk.Label(self.password_info_frame, text="URL : ")
+        self.password_info_url_label.grid(row=3, column=0, padx=5, pady=5)
+        self.password_info_url_entry = ttk.Entry(self.password_info_frame)
+        self.password_info_url_entry.grid(row=3, column=1, padx=5, pady=5)
+        self.password_info_url_entry.insert(0, password[4])
+
+        self.password_info_save_button = ttk.Button(self.password_info_frame, text="Sauvegarder")
+        self.password_info_save_button.grid(row=4, column=0, padx=10, pady=10)
+        self.password_info_delete_button = ttk.Button(self.password_info_frame, text="Supprimer", command=lambda password=password: self.delete_password(password))
+        self.password_info_delete_button.grid(row=4, column=1, padx=10, pady=10)
+
+    def delete_password(self, password):
+        reponse = askyesno("Supprimer", "Êtes vous sur de vouloir supprimer le mot de passe ?")
+        if reponse:
+            self.db.supprimer_mdp_titre(password[1])
+            self.update_password_list()
+
+    def update_password_info(self):
+        ...
+
     def show_passwords(self):
         for y_coeff, password in enumerate(self.get_passwords()):
             self.password = password
             button_password = ttk.Button(self.password_list_frame, text=self.password[1], command=lambda password=password: self.show_password_infos(password))
-            x = (self.password_list_canvas.winfo_reqwidth() / 2)
+            x = self.password_list_canvas.winfo_reqwidth() #( / 2)
             button_password_window = self.password_list_canvas.create_window(x, y_coeff*35+20, window=button_password)
 
     def add_password_save(self):

@@ -70,16 +70,16 @@ class Main:
 
 
         s = ttk.Style()
-        s.configure('red.TFrame', background='#FF0000')
+        s.configure('toolbar.TFrame', background='#d3d3d3')
         s.configure('green.TFrame', background='#00FF00')
         s.configure('blue.TFrame', background='#0000FF')
 
 
 
-        self.toolbar_frame = ttk.Frame(self.root, style="red.TFrame")
-        self.password_list_frame = ttk.Frame(self.root, style="green.TFrame")
+        self.toolbar_frame = ttk.Frame(self.root, style="toolbar.TFrame")
+        self.password_list_frame = ttk.Frame(self.root) #, style="green.TFrame"
         self.password_list_canvas = tk.Canvas(self.password_list_frame, scrollregion= (0, 0, 0, len(self.get_passwords())*35), height=self.password_list_frame.winfo_height(), width=50)
-        self.password_info_frame = ttk.Frame(self.root, style="blue.TFrame")
+        self.password_info_frame = ttk.Frame(self.root) #, style="blue.TFrame"
 
         self.toolbar_frame.pack(side="top", fill="x")
         self.password_list_frame.pack(fill="both", expand=True, side="left")
@@ -168,7 +168,7 @@ class Main:
     
     def show_password_infos(self, password):
         self.password_info_frame.destroy()
-        self.password_info_frame = ttk.Frame(self.root, style="blue.TFrame")
+        self.password_info_frame = ttk.Frame(self.root) #, style="blue.TFrame"
         self.password_info_frame.pack(fill="both", side="right") # expand=True,
 
         self.password_info_title_label = ttk.Label(self.password_info_frame, text="Titre : ")

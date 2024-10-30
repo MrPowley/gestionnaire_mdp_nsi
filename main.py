@@ -2,14 +2,14 @@ import sqlite3
 import tkinter as tk
 from tkinter import ttk
 from tkinter.messagebox import askyesno
+from tkinter.filedialog import askopenfilename, asksaveasfile 
 import os
 
 PWD = os.getcwd()
 
 class Base:
-    def __init__(self):
-        self.nom_db = "mdp"
-        self.db_path = os.path.join(PWD, self.nom_db + ".db")
+    def __init__(self, db_path):
+        self.db_path = db_path
 
         self.connecter()
         self.cursor.execute("""create table if not exists MDP(
@@ -56,14 +56,18 @@ class Base:
 
 class Main:
     def __init__(self):
-        # Initialisation de la base de mdp
-        self.db = Base()
+        self.choose_db_popup()
 
+    def main_menu(self):
+        try:
+            self.root.destroy()
+        except AttributeError:
+            pass
         # Initialisation de la fenêtre
         self.root = tk.Tk()
         self.root.title("Gestionnaire de Mots De Passe 2000")
-
         self.root.geometry("400x200")
+
 
         s = ttk.Style()
         s.configure('red.TFrame', background='#FF0000')
@@ -91,9 +95,54 @@ class Main:
         self.add_password_button = ttk.Button(self.toolbar_frame, text="Ajouter MDP", command=self.add_password_popup)
         self.add_password_button.pack(side="left",padx=2, pady=2)
 
+        self.choose_db_button = ttk.Button(self.toolbar_frame, text="Choisir la base", command=self.choose_db_popup)
+        self.choose_db_button.pack(side="left",padx=2, pady=2)
+
         self.show_passwords()
 
         self.root.mainloop()
+
+    def init_base(self, db_path = os.path.join(PWD, "mdp.db")):
+        self.db = Base(db_path=db_path)
+
+    def open_db(self):
+        filetypes = (
+            ('Database file', '*.db'),
+            ('All files', '*.*')
+            )
+        self.db_path = askopenfilename(title='Ouvrir une base', initialdir=PWD, filetypes=filetypes)
+        self.database_popup.destroy()
+        self.init_base(self.db_path)
+        self.main_menu()
+    
+    def create_db(self):
+        filetypes = (
+            ('Data Base File', '*.db'),
+            ('All files', '*.*')
+            )
+        file = asksaveasfile(title='Créer une base', initialdir=PWD, filetypes=filetypes, defaultextension = filetypes)
+        self.db_path = file.name
+        self.database_popup.destroy()
+        self.init_base(self.db_path)
+        self.main_menu()
+
+    def choose_db_popup(self):
+        self.database_popup = tk.Tk()
+        self.database_popup.title("Choisir une base")
+
+        # Titre
+        self.password_title_label = ttk.Label(self.database_popup, text="Que voulez vous choisir ?")
+        self.password_title_label.grid(row=0, column=0, columnspan=4)
+
+        # Buttons
+        self.database_open_button = ttk.Button(self.database_popup, text="Ouvrir un base", command=self.open_db)
+        self.database_open_button.grid(row=1, column=0)
+
+        self.database_create_button = ttk.Button(self.database_popup, text="Créer une base", command=self.create_db)
+        self.database_create_button.grid(row=1, column=1)
+
+        self.database_popup.mainloop()
+
 
     def get_passwords(self):
         return self.db.afficher_tout()
@@ -217,18 +266,5 @@ class Main:
 
 
 main = Main()
-
-db = Base()
-print(db.afficher_tout())
-
-
-
-
-
-
-
-
-
-
 
 

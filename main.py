@@ -1,11 +1,20 @@
 import sqlite3
 import tkinter as tk
 from tkinter import ttk
-from tkinter.messagebox import askyesno
+from tkinter.messagebox import askyesno, showerror
 from tkinter.filedialog import askopenfilename, asksaveasfile 
+from tkinter.simpledialog import askstring
 import os
+import cryptocode
+import hashlib
 
 PWD = os.getcwd()
+
+def hash_string(string):
+    """
+    Return a SHA-256 hash of the given string
+    """
+    return hashlib.sha256(string.encode('utf-8')).hexdigest()
 
 class Base:
     def __init__(self, db_path):
@@ -20,6 +29,11 @@ class Base:
     url text
     )
     """)
+        self.cursor.execute("""create table if not exists Maitre(
+    id integer primary key autoincrement unique,
+    password_hash text
+    )
+    """)
 
     def connecter(self) -> None:
         self.db = sqlite3.connect(self.db_path)
@@ -30,12 +44,11 @@ class Base:
         self.db.close()
 
     def ajouter_mdp(self, title: str, username: str, password: str, url: str) -> None:
-        print(title, username, password, url)
         self.cursor.execute("""insert into MDP(title, username, password, url) values(?, ?, ?, ?)""", (title, username, password, url))
         self.db.commit()
 
-    def supprimer_mdp_titre(self, title: str) -> None:
-        self.cursor.execute("""delete from MDP where title = ?""", (title, ))
+    def supprimer_mdp_id(self, id: int) -> None:
+        self.cursor.execute("""delete from MDP where id = ?""", (id, ))
         self.db.commit()
 
     def rechercher_titre(self, title: str) -> tuple:
@@ -53,6 +66,16 @@ class Base:
     def afficher_tout(self) -> list:
         self.cursor.execute("""select * from MDP order by title""")
         return self.cursor.fetchall()
+    
+    def afficher_hash_mdp_maitre(self):
+        self.cursor.execute("""select * from Maitre""")
+        return self.cursor.fetchone()
+    
+    def choisir_mdp_maitre(self, hash):
+        self.cursor.execute("""insert into Maitre(password_hash) values(?)""", (hash,))
+        self.db.commit()
+
+
 
 class Main:
     def __init__(self):
@@ -111,9 +134,19 @@ class Main:
             ('All files', '*.*')
             )
         self.db_path = askopenfilename(title='Ouvrir une base', initialdir=PWD, filetypes=filetypes)
-        self.database_popup.destroy()
+
+        self.master_password_hash = hash_string(askstring(
+            title="Base de mots de passe", prompt="Veuillez entrer le MDP Maitre"))
         self.init_base(self.db_path)
-        self.main_menu()
+        self.db_master_password = self.db.afficher_hash_mdp_maitre()[1]
+        
+        if self.master_password_hash == self.db_master_password:
+            self.database_popup.destroy()
+            self.main_menu()
+            return
+        
+        showerror("MDP", "Mauvais mot de passe Maitre")
+        
     
     def create_db(self):
         filetypes = (
@@ -122,9 +155,23 @@ class Main:
             )
         file = asksaveasfile(title='Créer une base', initialdir=PWD, filetypes=filetypes, defaultextension = filetypes)
         self.db_path = file.name
-        self.database_popup.destroy()
         self.init_base(self.db_path)
-        self.main_menu()
+
+        self.master_password_hash_1 = hash_string(askstring(
+            title="Base", prompt="Veuillez entrer un nouveau MDP Maitre"))
+        self.master_password_hash_2 = hash_string(askstring(
+            title="Base de mots de passe", prompt="Veuillez confirmer le MDP Maitre"))
+        
+        if self.master_password_hash_1 == self.master_password_hash_2:
+            self.master_password_hash = self.master_password_hash_1
+            self.db.choisir_mdp_maitre(self.master_password_hash)
+            self.database_popup.destroy()
+            self.main_menu()
+            return
+        
+        showerror("MDP", "Les 2 mots de passe ne correspondent pas")
+        
+
 
     def choose_db_popup(self):
         self.database_popup = tk.Tk()
@@ -140,6 +187,8 @@ class Main:
 
         self.database_create_button = ttk.Button(self.database_popup, text="Créer une base", command=self.create_db)
         self.database_create_button.grid(row=1, column=1)
+
+
 
         self.database_popup.mainloop()
 
@@ -203,21 +252,27 @@ class Main:
     def delete_password(self, password):
         reponse = askyesno("Supprimer", "Êtes vous sur de vouloir supprimer le mot de passe ?")
         if reponse:
-            self.db.supprimer_mdp_titre(password[1])
+            self.db.supprimer_mdp_id(password[0])
             self.update_password_list()
 
     def update_password_info(self):
         ...
 
     def show_passwords(self):
-        for y_coeff, password in enumerate(self.get_passwords()):
-            self.password = password
-            button_password = ttk.Button(self.password_list_frame, text=self.password[1], command=lambda password=password: self.show_password_infos(password))
+        for y_coeff, encoded_password in enumerate(self.get_passwords()):
+            decoded_password = [encoded_password[0]] + [cryptocode.decrypt(encoded_items, self.master_password_hash) for encoded_items in encoded_password[1:]]
+            self.password = decoded_password
+            button_password = ttk.Button(self.password_list_frame, text=self.password[1], command=lambda password=decoded_password: self.show_password_infos(password))
             x = self.password_list_canvas.winfo_reqwidth() #( / 2)
             button_password_window = self.password_list_canvas.create_window(x, y_coeff*35+20, window=button_password)
 
     def add_password_save(self):
-        self.db.ajouter_mdp(self.password_title_var.get(), self.password_username_var.get(), self.password_password_var.get(), self.password_url_var.get())
+        self.password_title_var_encoded = cryptocode.encrypt(self.password_title_var.get(), self.master_password_hash)
+        self.password_username_var_encoded = cryptocode.encrypt(self.password_username_var.get(), self.master_password_hash)
+        self.password_password_var_encoded = cryptocode.encrypt(self.password_password_var.get(), self.master_password_hash)
+        self.password_url_var_encoded = cryptocode.encrypt(self.password_url_var.get(), self.master_password_hash)
+
+        self.db.ajouter_mdp(self.password_title_var_encoded, self.password_username_var_encoded, self.password_password_var_encoded, self.password_url_var_encoded)
         self.popup.destroy()
         self.update_password_list()
 
@@ -266,5 +321,9 @@ class Main:
 
 
 main = Main()
+
+# base = Base("mdp3.db")
+# print(base.choisir_mdp_maitre("dhuqzdqz"))
+# print(base.afficher_hash_mdp_maitre())
 
 

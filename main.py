@@ -160,8 +160,10 @@ class Main:
                 return
 
             showerror("MDP", "Mauvais mot de passe Maitre")
+            return
 
         showerror("Base", "Vous n'avez pas choisi de fichier valide")
+        return
 
     def create_db(self):
         filetypes = (
@@ -187,8 +189,10 @@ class Main:
                 return
 
             showerror("MDP", "Les 2 mots de passe ne correspondent pas")
+            return
 
         showerror("Base", "Vous n'avez pas choisi de fichier valide")
+        return
 
     def choose_db_popup(self):
         self.database_popup = tk.Tk()

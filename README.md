@@ -10,4 +10,7 @@ N.H.
 - Choix de base de donnée pour MDP
 - Vraie encryption des MDP
 - MDP Maitre pour acceder à la base de donnée
-- WIP - Modification de MDP
+- Modification de MDP
+
+# Dépendances
+- [cryptocode](https://github.com/gdavid7/cryptocode)

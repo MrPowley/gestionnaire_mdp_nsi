@@ -7,6 +7,7 @@ from tkinter.simpledialog import askstring
 import os
 import cryptocode
 import hashlib
+from profilehooks import profile
 
 # Chemin d'accès du dossier parent
 PWD = os.getcwd()
@@ -36,13 +37,13 @@ class Base:
     password_hash text
     )
     """)
-    
+
     # Fonction pour se connecter à la base et initialiser le curseur
     def connecter(self) -> None:
         self.db = sqlite3.connect(self.db_path)
         self.cursor = self.db.cursor()
         self.db.commit()
-    
+
     # Fonction pour se déconnecter de la base (Pas utilisée)
     def deconnecter(self) -> None:
         self.db.close()
@@ -115,7 +116,7 @@ class Main:
 
         # Buttons
         self.database_open_button = ttk.Button(
-            self.database_popup, text="Ouvrir un base", command=self.open_db)
+            self.database_popup, text="Ouvrir une base", command=self.open_db)
         self.database_open_button.grid(row=1, column=0)
 
         self.database_create_button = ttk.Button(
@@ -169,7 +170,7 @@ class Main:
         if file:
             self.db_path = file.name
             self.init_base(self.db_path)
-            
+
             # On demande 2 fois le mdp pour avoir une confirmation
             self.master_password_hash_1 = hash_string(askstring(
                 title="Base", prompt="Veuillez entrer un nouveau MDP Maitre"))
@@ -188,8 +189,9 @@ class Main:
             return
 
         showerror("Base", "Vous n'avez pas choisi de fichier valide")
+        print(1)
         return
-    
+
     # Fonction de la fenêtre principale
     def main_menu(self):
         # la fonction pourra être appelée plusieurs fois au cours du code, donc on s'assure de la supprimer avant de la ré-afficher
@@ -209,6 +211,7 @@ class Main:
 
         # Barre d'outil
         self.toolbar_frame = ttk.Frame(self.root, style="toolbar.TFrame")
+
         # Zone de liste de mdp
         self.password_list_frame = ttk.Frame(
             self.root)  # , style="green.TFrame"
@@ -233,6 +236,10 @@ class Main:
         # Barre de défilement
         self.scrollbar = ttk.Scrollbar(
             self.password_list_canvas, orient="vertical", command=self.password_list_canvas.yview)
+
+        self.scrollbar.bind(
+            "<MouseWheel>", lambda e: self.password_list_canvas.yview_scroll(int(-e.delta/60), "units"))
+
         self.password_list_canvas.configure(yscrollcommand=self.scrollbar.set)
         self.scrollbar.place(relx=1, rely=0, relheight=1, anchor="ne")
 
@@ -245,44 +252,102 @@ class Main:
             self.toolbar_frame, text="Choisir la base", command=self.choose_db_popup)
         self.choose_db_button.pack(side="left", padx=2, pady=2)
 
+        # Barre de recherche et menu
+        self.filtres = ["Id", "Titre", "Utilisateur", "MDP", "URL", "Tout"]
+        self.filter_value = tk.StringVar(self.toolbar_frame)
+        self.filter_value.set("Titre")
+        print(self.filter_value.get())
+        
+        self.filtre_recherche = ttk.OptionMenu(self.toolbar_frame, self.filter_value, "Titre", *self.filtres)
+        self.filtre_recherche.pack(side="left", padx=2, pady=2)
+
+        self.barre_recherche = ttk.Entry(self.toolbar_frame)
+        self.barre_recherche.pack(side="left", padx=2, pady=2)
+        self.barre_recherche.bind("<Return>", self.update_password_list)
+
         # On affiche les mdp dans la zone
         self.show_passwords()
 
         self.root.mainloop()
 
+    def decode_password(self, encoded_password):
+        return list(filter(None, cryptocode.decrypt(encoded_password.split("%")[1], "azerty123").split("%")))
+
+    def encode_password(self, decoded_password):
+        password = ""
+        for item in decoded_password[1:]:
+            password += str(item) + "%"
+        password = decoded_password[0] + "%" + cryptocode.encrypt(password, "azerty123")
+        return password
+    
     # Fonction pour afficher les mdp dans la zone de liste
     def show_passwords(self):
+        if hasattr(self, 'filtered_passwords'):
+            password_list = self.filtered_passwords
+        else:
+            password_list = [self.decode_password(password) for password in self.get_passwords()]
+
         # Pour chaque mdp, on récupère son indice et sa valeur
-        for y_coeff, encoded_password in enumerate(self.get_passwords()):
-            # On décode chaque partie du mdp (id, titre, nom d'utilisateur, mdp, url)
-            decoded_password = [encoded_password[0]] + [cryptocode.decrypt(
-                encoded_items, self.master_password_hash) for encoded_items in encoded_password[1:]]
-            
+        for y_coeff, decoded_password in enumerate(password_list):
             self.password = decoded_password
             # On créé un bouton qui seriva a afficher les infos du mdp
             button_password = ttk.Button(
                 self.password_list_frame, text=self.password[1], command=lambda password=decoded_password: self.show_password_infos(password)) # On utilise on fonction lambda car on veut garder en mémoire le mdp à chaque itération de la boucle pour pouvoir intéragir avec, si on utilise pas une fonction lambda, le mdp enregistré sera le dernier de la boucle
             x = self.password_list_canvas.winfo_reqwidth()  # On récupère la largeur de la zone de liste pour y mettre les boutons
+            button_password.bind(
+            "<MouseWheel>", lambda e: self.password_list_canvas.yview_scroll(int(-e.delta/60), "units"))
             button_password_window = self.password_list_canvas.create_window(
                 x, y_coeff*35+20, window=button_password) # On créé un fenêtre\widget de bouton dans le canvas en utilise l'indice du mdp comme coeficient de sa coordonée y (pour les espacer)
-        showerror("Base", "Vous n'avez pas choisi de fichier valide")
-        return
-    
+
     # Fonction pour récuperer tout les mdp
     def get_passwords(self):
         return self.db.afficher_tout()
 
     # Fonction pour maj la liste de mdp
-    def update_password_list(self):
+    @profile
+    def update_password_list(self, e = None):
         # On supprime l'ancienne liste
         self.password_list_frame.destroy()
         self.password_list_canvas.destroy()
         self.scrollbar.destroy()
 
+        passwords = self.get_passwords()
+
+        match self.filter_value.get():
+            case "Id":
+                filter = 0
+            case "Titre":
+                filter = 1
+            case "Utilisateur":
+                filter = 2
+            case "MDP":
+                filter = 3
+            case "URL":
+                filter = 4
+            case "Tout":
+                filter = None
+
+        self.filtered_passwords = []
+
+        for password in passwords:
+            password = self.decode_password(password)
+            recherche = self.barre_recherche.get().lower()
+
+            if recherche:
+                if filter is not None:
+                    if recherche in str(password[filter]).lower():
+                        self.filtered_passwords.append(password)
+                else:
+                    if any(recherche in str(item).lower() for item in password):
+                        self.filtered_passwords.append(password)
+            else:
+                self.filtered_passwords.append(password)
+                # afficher tout
+
+
         # On la recréé avec les nouveaux mdp
         self.password_list_frame = ttk.Frame(self.root)
-        self.password_list_canvas = tk.Canvas(self.password_list_frame, scrollregion=(0, 0, 0, len(
-            self.get_passwords())*35), height=self.password_list_frame.winfo_height(), width=50)
+        self.password_list_canvas = tk.Canvas(self.password_list_frame, scrollregion=(0, 0, 0, len(self.filtered_passwords)*35), height=self.password_list_frame.winfo_height(), width=50)
 
         self.password_list_frame.pack(fill="both", expand=True, side="left")
         self.password_list_canvas.pack(fill="both", expand=True, side="left")
@@ -291,6 +356,10 @@ class Main:
             "<MouseWheel>", lambda e: self.password_list_canvas.yview_scroll(int(-e.delta/60), "units"))
         self.scrollbar = ttk.Scrollbar(
             self.password_list_canvas, orient="vertical", command=self.password_list_canvas.yview)
+
+        self.scrollbar.bind(
+            "<MouseWheel>", lambda e: self.password_list_canvas.yview_scroll(int(-e.delta/60), "units"))
+
         self.password_list_canvas.configure(yscrollcommand=self.scrollbar.set)
         self.scrollbar.place(relx=1, rely=0, relheight=1, anchor="ne")
 
@@ -356,14 +425,7 @@ class Main:
 
     # Fonctions pour maj les infos d'un mdp dans la base
     def update_password_info(self, password):
-        self.password_title_var_encoded = cryptocode.encrypt(
-            self.password_info_title_entry.get(), self.master_password_hash)
-        self.password_username_var_encoded = cryptocode.encrypt(
-            self.password_info_username_entry.get(), self.master_password_hash)
-        self.password_password_var_encoded = cryptocode.encrypt(
-            self.password_info_password_entry.get(), self.master_password_hash)
-        self.password_url_var_encoded = cryptocode.encrypt(
-            self.password_info_url_entry.get(), self.master_password_hash)
+        password = [password[0], self.password_info_title_entry.get(), self.password_info_username_entry.get(), self.password_info_password_entry.get(), self.password_info_url_entry.get()]
 
         # Change les infos du mdp en utilisant son id
         self.db.changer_mdp(password[0], self.password_title_var_encoded, self.password_username_var_encoded,
@@ -375,30 +437,24 @@ class Main:
         # On utilise TopLevel car sa créé une fenêtre enfant, au premier plan
         self.popup = tk.Toplevel(self.root)
         self.popup.title("Ajouter un MDP")
+        self.popup.bind("<Return>", self.add_password_save)
 
         # Titre
         self.password_title_label = ttk.Label(self.popup, text="Titre")
-        self.password_title_var = tk.StringVar()
-        self.password_title_entry = ttk.Entry(
-            self.popup, textvariable=self.password_title_var)
+        self.password_title_entry = ttk.Entry(self.popup)
+        self.password_title_entry.focus_set()
 
         # Nom d'utilisateur
         self.password_username_label = ttk.Label(self.popup, text="Username")
-        self.password_username_var = tk.StringVar()
-        self.password_username_entry = ttk.Entry(
-            self.popup, textvariable=self.password_username_var)
+        self.password_username_entry = ttk.Entry(self.popup)
 
         # MDP
         self.password_password_label = ttk.Label(self.popup, text="Password")
-        self.password_password_var = tk.StringVar()
-        self.password_password_entry = ttk.Entry(
-            self.popup, textvariable=self.password_password_var)
+        self.password_password_entry = ttk.Entry(self.popup)
 
         # URL
         self.password_url_label = ttk.Label(self.popup, text="URL")
-        self.password_url_var = tk.StringVar()
-        self.password_url_entry = ttk.Entry(
-            self.popup, textvariable=self.password_url_var)
+        self.password_url_entry = ttk.Entry(self.popup)
 
         # Buttons
         self.password_save_button = ttk.Button(
@@ -420,16 +476,16 @@ class Main:
         self.password_save_button.grid(row=4, column=0, padx=20, pady=5)
 
     # Fonction pour enregistrer le mdp entré
-    def add_password_save(self):
+    def add_password_save(self, _):
         # Récupère et encode les infos du mdp
         self.password_title_var_encoded = cryptocode.encrypt(
-            self.password_title_var.get(), self.master_password_hash)
+            self.password_title_entry.get(), self.master_password_hash)
         self.password_username_var_encoded = cryptocode.encrypt(
-            self.password_username_var.get(), self.master_password_hash)
+            self.password_username_entry.get(), self.master_password_hash)
         self.password_password_var_encoded = cryptocode.encrypt(
-            self.password_password_var.get(), self.master_password_hash)
+            self.password_password_entry.get(), self.master_password_hash)
         self.password_url_var_encoded = cryptocode.encrypt(
-            self.password_url_var.get(), self.master_password_hash)
+            self.password_url_entry.get(), self.master_password_hash)
 
         # Ajoute le mdp à la base et supprime la fenêtre
         self.db.ajouter_mdp(self.password_title_var_encoded, self.password_username_var_encoded,

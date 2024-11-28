@@ -8,6 +8,7 @@ import os
 import cryptocode
 import hashlib
 import time
+import webbrowser
 # from profilehooks import profile
 
 # Chemin d'accès du dossier parent
@@ -77,7 +78,7 @@ class Base:
         self.cursor.execute(
             """update MDP set hash = ? where id = ?""", (hash, id))
         self.db.commit()
-    
+
     def get_last_password(self):
         self.cursor.execute(
             """select * from MDP order by id desc limit 1"""
@@ -123,7 +124,7 @@ class Main:
         self.db = Base(db_path=db_path)
 
     def open_db(self):
-        
+
         db_path = askopenfilename(title='Ouvrir une base', initialdir=PWD, filetypes=self.filetypes)
 
         if not db_path:
@@ -133,7 +134,7 @@ class Main:
                 title="Base de mots de passe",
                 prompt="Veuillez entrer le MDP Maitre",
                 initialvalue="")
-        
+
         if not master_password:
             return
 
@@ -145,16 +146,16 @@ class Main:
         if self.master_password_hash != self.db.afficher_hash_mdp_maitre()[1]:
             showerror("MDP", "Mauvais mot de passe Maitre")
             return
-        
+
 
         self.database_popup.destroy()
         self.main_menu()
         return
-        
+
 
     # Fonction pour créer une base (Quasiment la même chose que pour ouvrir)
     def create_db(self):
-        
+
         db_path = asksaveasfile(title='Créer une base', initialdir=PWD, filetypes=self.filetypes, defaultextension=self.filetypes).name
 
         self.init_base(db_path)
@@ -168,7 +169,7 @@ class Main:
         if master_password_hash_1 != master_password_hash_2:
             showerror("MDP", "Les 2 mots de passe ne correspondent pas")
             return
-        
+
         # On enregistre le mdp maitre dans la base et on affiche le menu principal
         self.master_password_hash = master_password_hash_1
         self.db.choisir_mdp_maitre(self.master_password_hash)
@@ -177,19 +178,6 @@ class Main:
         self.main_menu()
         return
 
-        
-    def draw_list(self):
-        # On créé toute la partie gauche de l'interface, à savoir le treeview, la scrollbar, dans une frame adaptée
-        self.password_treeview_frame = ttk.Frame(self.root)
-        self.scrollbar = ttk.Scrollbar(self.password_treeview_frame)
-        self.password_treeview = ttk.Treeview(self.password_treeview_frame, yscrollcommand=self.scrollbar.set, show="tree")
-
-        self.password_treeview_frame.pack(fill="both", expand=True, side="left")
-        self.password_treeview.pack(fill="both", expand=True, side="left")
-        self.scrollbar.pack(side="right", fill="y")
-
-        # Au relachement du clic gauche
-        self.password_treeview.bind("<ButtonRelease-1>", self.show_password_infos)
 
     # Fonction de la fenêtre principale
     def main_menu(self):
@@ -210,12 +198,13 @@ class Main:
 
         # Barre d'outil
         self.toolbar_frame = ttk.Frame(self.root, style="toolbar.TFrame")
+        self.toolbar_frame.pack(side="top", fill="x")
 
         # Zone de liste de mdp
         self.draw_list()
-        
-        
-        
+
+
+
         self.scrollbar.configure(command=self.password_treeview.yview)
 
         # Zone d'information du mdp selectionné
@@ -223,10 +212,9 @@ class Main:
             self.root)  # , style="blue.TFrame"
 
         # Affichage des zones
-        self.toolbar_frame.pack(side="top", fill="x")
-        
+
         self.password_info_frame.pack(fill="both", side="right")  # expand=True,
-        
+
 
         # Bouton de la barre d'outil pour ajouter un mdp
         self.add_password_button = ttk.Button(
@@ -263,28 +251,38 @@ class Main:
         password = [id] + [cryptocode.encrypt(password, self.master_password_hash)]
         return password
 
-    def color_password_tree(self):
-        for index, iid in enumerate(self.password_treeview.get_children()):
-            if index % 2 == 0:
-                self.password_treeview.item(iid, tags=("lignepair",))
-            else:
-                self.password_treeview.item(iid, tags=("ligneimpair",))
-        
-        self.password_treeview.tag_configure("lignepair", background="lightgray")
-        self.password_treeview.tag_configure("ligneimpair", background="white")
+    def add_password_to_list(self, password):
 
-    def show_single_password(self, password):
+        password_number = len(self.password_treeview.get_children()) + 1
+        if password_number % 2 == 0:
+            tag = "lignepair"
+        else:
+            tag = "ligneimpair"
+
         self.password = password
         # On créé un bouton qui seriva a afficher les infos du mdp
-        self.password_treeview.insert("", "end", text=password[1], values=password)
+        self.password_treeview.insert("", "end", text=password[1], tag=tag, values=password)
 
-        self.color_password_tree()
-        
     # Fonction pour afficher les mdp dans la zone de liste
     def show_all_passwords(self):
         for decoded_password in self.filtered_passwords:
-            self.show_single_password(decoded_password)
-            
+            self.add_password_to_list(decoded_password)
+
+    def draw_list(self):
+        # On créé toute la partie gauche de l'interface, à savoir le treeview, la scrollbar, dans une frame adaptée
+        self.password_treeview_frame = ttk.Frame(self.root)
+        self.scrollbar = ttk.Scrollbar(self.password_treeview_frame)
+        self.password_treeview = ttk.Treeview(self.password_treeview_frame, yscrollcommand=self.scrollbar.set, show="tree")
+
+        self.password_treeview.tag_configure("lignepair", background="black")
+        self.password_treeview.tag_configure("ligneimpair", background="white")
+
+        self.password_treeview_frame.pack(fill="both", expand=True, side="left")
+        self.password_treeview.pack(fill="both", expand=True, side="left")
+        self.scrollbar.pack(side="right", fill="y")
+
+        # Au relachement du clic gauche
+        self.password_treeview.bind("<ButtonRelease-1>", self.show_password_infos)
 
     # Fonction pour récuperer tout les mdp
     def get_passwords(self):
@@ -293,8 +291,6 @@ class Main:
     # Fonction pour maj la liste de mdp
     # @profile
     def draw_password_treeview(self, e = None):
-        # On supprime l'ancienne liste
-        self.password_treeview_frame.destroy()
 
         filter = self.filter_value.get()
         if filter == "Id":
@@ -311,10 +307,10 @@ class Main:
             filter = None
 
         self.filtered_passwords = []
-        self.password_treeview = [tuple(self.decode_password(password)) for password in self.get_passwords()]
+        self.password_list = [tuple(self.decode_password(password)) for password in self.get_passwords()]
 
 
-        for password in self.password_treeview:
+        for password in self.password_list:
             recherche = self.barre_recherche.get().lower()
 
             if recherche:
@@ -330,7 +326,6 @@ class Main:
 
 
         # On la recréé avec les nouveaux mdp
-        self.draw_list()
 
         self.show_all_passwords()
 
@@ -338,7 +333,10 @@ class Main:
         self.root.clipboard_clear()
         self.root.clipboard_append(text)
         return
-    
+
+    def open_url(self, url):
+        webbrowser.open(url)
+
     # Fonction pour afficher les infos d'un mdp
     def show_password_infos(self, e = None):
         # On supprime l'ancienne pour afficher les nouvelles infos
@@ -369,7 +367,7 @@ class Main:
         self.password_info_username_entry = ttk.Entry(self.password_info_frame)
         self.password_info_username_entry.grid(row=1, column=1, padx=5, pady=5)
         self.password_info_username_entry.insert(0, password[2])
-        
+
         self.username_copy_button = ttk.Button(self.password_info_frame, text="Copier", command=lambda: self.add_to_clipboard(password[2]))
         self.username_copy_button.grid(row=1, column=2, padx=5, pady=5)
 
@@ -394,7 +392,7 @@ class Main:
         self.password_info_url_entry.grid(row=3, column=1, padx=5, pady=5)
         self.password_info_url_entry.insert(0, password[4])
 
-        self.url_copy_button = ttk.Button(self.password_info_frame, text="Copier", command=lambda: self.add_to_clipboard(password[4]))
+        self.url_copy_button = ttk.Button(self.password_info_frame, text="Ouvrir", command=lambda: self.open_url(password[4]))
         self.url_copy_button.grid(row=3, column=2, padx=5, pady=5)
 
 
@@ -409,6 +407,15 @@ class Main:
         self.password_info_delete_button.grid(
             row=4, column=1, padx=10, pady=10)
 
+    # Fonctions pour maj les infos d'un mdp dans la base
+    def update_password_info(self, password):
+        id = password[0]
+        password = [self.password_info_title_entry.get(), self.password_info_username_entry.get(), self.password_info_password_entry.get(), self.password_info_url_entry.get()]
+        encoded_password = self.encode_password(password, id)
+        # Change les infos du mdp en utilisant son id
+        self.db.changer_mdp(encoded_password[0], encoded_password[1])
+        self.update_password_list()
+
     # Fontion pour supprimer un mdp
     def delete_password(self, password):
         # Affiche un avertissement
@@ -419,14 +426,6 @@ class Main:
             self.db.supprimer_mdp_id(password[0])
             self.update_password_list()
 
-    # Fonctions pour maj les infos d'un mdp dans la base
-    def update_password_info(self, password):
-        id = password[0]
-        password = [self.password_info_title_entry.get(), self.password_info_username_entry.get(), self.password_info_password_entry.get(), self.password_info_url_entry.get()]
-        encoded_password = self.encode_password(password, id)
-        # Change les infos du mdp en utilisant son id
-        self.db.changer_mdp(encoded_password[0], encoded_password[1])
-        self.update_password_list()
 
     # Affiche une fenêtre pour ajouter un mdp
     def add_password_popup(self):
@@ -484,18 +483,12 @@ class Main:
 
         encoded_password = self.db.get_last_password()
         decoded_password = self.decode_password(encoded_password)
-        self.password_set.add(decoded_password)
+        self.password_list.append(decoded_password)
 
         # Ajoute le mdp à la base et supprime la fenêtre
         self.popup.destroy()
-        self.update_password_list()
+        self.add_password_to_list(decoded_password)
 
 
 
 main = Main()
-
-main.master_password_hash = "a"
-ep = main.encode_password(["titre", "user", "mdp", "url"])
-print(ep)
-dp = main.decode_password(ep)
-print(dp)

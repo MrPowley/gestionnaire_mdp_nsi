@@ -9,6 +9,8 @@ import cryptocode
 import hashlib
 import time
 import webbrowser
+import threading
+import queue
 # from profilehooks import profile
 
 # Chemin d'accès du dossier parent
@@ -191,10 +193,7 @@ class Main:
             self.root.destroy()
         except AttributeError:
             pass
-        
-        # On décode les mots de passe tout de suite
-        # TODO Faire fonction à part avec threading pour ne pas retarder l'interface le temps de décoder
-        self.get_passwords()
+    
 
         # Initialisation de la fenêtre
         self.root = tk.Tk()
@@ -240,9 +239,11 @@ class Main:
         self.barre_recherche.pack(side="left", padx=2, pady=2)
         self.barre_recherche.bind("<Return>", self.fill_treeview)
 
+        # On décode les mots de passe tout de suite
+        self.get_passwords()
+
         # On affiche les mdp dans la zone
         self.fill_treeview()
-
         self.root.mainloop()
 
     def draw_treeview(self):
@@ -357,10 +358,15 @@ class Main:
 
     def get_passwords(self):
         passwords = self.db.afficher_tout()
+        self.password_list = []
 
-        self.password_list = [self.decode_password(password) for password in passwords]
-        print(1)
+        def decoder():
+            for password in passwords:
+                decoded = self.decode_password(password)
+                self.password_list.append(decoded)
+                self.add_password_to_list(decoded)
 
+        threading.Thread(target=decoder, daemon=True).start()
 
     def add_to_clipboard(self, text):
         self.root.clipboard_clear()

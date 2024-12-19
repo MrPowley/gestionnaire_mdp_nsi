@@ -494,7 +494,7 @@ class Main:
 
         # MDP
         self.password_password_label = ttk.Label(self.popup, text="Mot De Passe")
-        self.password_password_entry = ttk.Entry(self.popup)
+        self.password_password_entry = ttk.Entry(self.popup, show="*")
 
         # URL
         self.password_url_label = ttk.Label(self.popup, text="URL")
